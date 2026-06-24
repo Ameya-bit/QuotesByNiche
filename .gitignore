@@ -1,2 +1,3 @@
 data/*
 niche_model.pt
+niche_model_last.pt
