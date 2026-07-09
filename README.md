@@ -1,6 +1,6 @@
 # Niche
 
-A small character-level GPT-style transformer trained from scratch on the (English, public-domain) works of Friedrich Nietzsche. It's a learning project — the goal is to build a decoder-only transformer by hand and watch it learn to imitate Nietzsche's prose, not to produce a state-of-the-art language model.
+A small character-level GPT-style transformer trained from scratch on the (English, public-domain) works of Friedrich Nietzsche. It's a learning project — the goal is to build a decoder-only transformer by hand and watch it learn to imitate Nietzsche's prose, not to produce a state-of-the-art language model. The repo also contains a mechanistic-interpretability analysis of the trained weights that identifies an induction/copying head, **B5H0** — see [Interpretability](#interpretability) and the full writeup in [`interp/induction_head.md`](interp/induction_head.md).
 
 ## Repo structure
 
@@ -24,6 +24,14 @@ Niche/
 ```
 
 The `model/niche.ipynb` notebook is the training project. Cells run top-to-bottom: imports → hyperparameters → load/encode data → train/test split → batching → model classes → **resume from checkpoint** → **training loop** → manual save → sample generation.
+
+## Setup
+
+```bash
+pip install -r requirements.txt
+```
+
+Then open the notebooks: `model/niche.ipynb` to train/generate (fetch the corpus first — see below), or `interp/niche_attention_analysis.ipynb` to reproduce the interpretability analysis against the committed `niche_model.pt` checkpoint.
 
 ## Interpretability
 
