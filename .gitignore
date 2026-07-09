@@ -1,3 +1,17 @@
+# data & model checkpoints
 data/*
 niche_model.pt
 niche_model_last.pt
+
+# python
+__pycache__/
+*.pyc
+venv/
+
+# latex build artifacts
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
