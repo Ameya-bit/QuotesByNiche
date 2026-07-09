@@ -8,7 +8,7 @@ A small character-level GPT-style transformer trained from scratch on the (Engli
 Niche/
 ├── niche.ipynb                     # everything: data prep, model, training loop, generation
 ├── niche_classes.py                # model classes extracted from the notebook, importable
-├── grab_nietzche.py                # downloads the corpus from Project Gutenberg
+├── grab_nietzsche.py               # downloads the corpus from Project Gutenberg
 ├── data/                           # downloaded texts (git-ignored)
 │   ├── grabbed_nietzsche.txt           # all books concatenated — this is what training reads
 │   └── <book>.txt                      # individual books, cached so re-runs don't re-download
@@ -27,7 +27,7 @@ The `niche.ipynb` notebook is the training project. Cells run top-to-bottom: imp
 
 After training, `niche_attention_analysis.ipynb` digs into the attention heads (copying scores, OV diagonals, attention patterns, targeted ablations). The findings — a copying head with the OV half of a bracket-completion mechanism but a QK circuit that can't route it — are written up in [`induction_head.md`](induction_head.md), with figures in `figures/` and raw numbers in [`evidence.md`](evidence.md).
 
-Data is not committed (`.gitignore` excludes `data/` and `niche_model.pt`). Run `python grab_nietzche.py` to fetch the 13 texts from Gutenberg into `data/`; it strips the Gutenberg boilerplate and writes the concatenated `grabbed_nietzsche.txt` that training consumes.
+Data is not committed (`.gitignore` excludes `data/` and `niche_model.pt`). Run `python grab_nietzsche.py` to fetch the 13 texts from Gutenberg into `data/`; it strips the Gutenberg boilerplate and writes the concatenated `grabbed_nietzsche.txt` that training consumes.
 
 ## How the transformer is structured
 
