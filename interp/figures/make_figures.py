@@ -5,16 +5,16 @@ that live in ``niche_attention_analysis.ipynb`` (lifted verbatim below, marked
 "from the notebook" -- the logic is not reinvented here). Each figure is written
 to ``figures/`` as both PNG (for the post) and SVG.
 
-Run from the repo root:  ./venv/bin/python figures/make_figures.py
+Run from the repo root:  ./venv/bin/python interp/figures/make_figures.py
 """
 from __future__ import annotations
 
 import os
 import sys
 
-# Make the repo root importable so ``niche_classes`` resolves regardless of the
-# working directory: running ``python figures/make_figures.py`` puts figures/,
-# not the repo root, on sys.path. This makes the documented run command work.
+# Make interp/ importable so ``niche_classes`` resolves regardless of the
+# working directory: running ``python interp/figures/make_figures.py`` puts
+# figures/, not interp/, on sys.path. This makes the documented run command work.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import torch
@@ -100,7 +100,7 @@ def save(fig, name: str) -> None:
 # ---------------------------------------------------------------------------
 # Analysis functions -- lifted verbatim from niche_attention_analysis.ipynb.
 # ---------------------------------------------------------------------------
-m = load_model(os.path.join(HERE, "..", "niche_model.pt"), map_location="cpu")
+m = load_model(os.path.join(HERE, "..", "..", "niche_model.pt"), map_location="cpu")
 
 
 def independent_weights(attention_block, attention_head):

@@ -6,28 +6,30 @@ A small character-level GPT-style transformer trained from scratch on the (Engli
 
 ```
 Niche/
-├── niche.ipynb                     # everything: data prep, model, training loop, generation
-├── niche_classes.py                # model classes extracted from the notebook, importable
-├── grab_nietzsche.py               # downloads the corpus from Project Gutenberg
-├── data/                           # downloaded texts (git-ignored)
-│   ├── grabbed_nietzsche.txt           # all books concatenated — this is what training reads
-│   └── <book>.txt                      # individual books, cached so re-runs don't re-download
-├── niche_model.pt                  # best-val checkpoint (committed — the interp writeup analyzes these exact weights)
-├── niche_attention_analysis.ipynb  # mech-interp: copying scores, OV/QK circuits, ablations
-├── induction_head.md               # writeup of the interpretability findings
-├── evidence.md                     # raw per-head copying-score numbers backing the writeup
-├── figures/                        # figures for the writeup + make_figures.py to regenerate them
+├── model/                              # everything for training the model
+│   ├── niche.ipynb                         # data prep, model, training loop, generation
+│   ├── grab_nietzsche.py                   # downloads the corpus from Project Gutenberg
+│   └── data/                               # downloaded texts (git-ignored)
+│       ├── grabbed_nietzsche.txt               # all books concatenated — this is what training reads
+│       └── <book>.txt                          # individual books, cached so re-runs don't re-download
+├── interp/                             # everything for interpreting the trained model
+│   ├── niche_attention_analysis.ipynb      # mech-interp: copying scores, OV/QK circuits, ablations
+│   ├── niche_classes.py                    # model classes extracted from the notebook, importable
+│   ├── induction_head.md                   # writeup of the interpretability findings
+│   ├── evidence.md                         # raw per-head copying-score numbers backing the writeup
+│   └── figures/                            # figures for the writeup + make_figures.py to regenerate them
+├── niche_model.pt                      # best-val checkpoint (committed — the interp writeup analyzes these exact weights)
 ├── requirements.txt
 └── README.md
 ```
 
-The `niche.ipynb` notebook is the training project. Cells run top-to-bottom: imports → hyperparameters → load/encode data → train/test split → batching → model classes → **resume from checkpoint** → **training loop** → manual save → sample generation.
+The `model/niche.ipynb` notebook is the training project. Cells run top-to-bottom: imports → hyperparameters → load/encode data → train/test split → batching → model classes → **resume from checkpoint** → **training loop** → manual save → sample generation.
 
 ## Interpretability
 
-After training, `niche_attention_analysis.ipynb` digs into the attention heads (copying scores, OV diagonals, attention patterns, targeted ablations). The findings — a copying head with the OV half of a bracket-completion mechanism but a QK circuit that can't route it — are written up in [`induction_head.md`](induction_head.md), with figures in `figures/` and raw numbers in [`evidence.md`](evidence.md).
+After training, `interp/niche_attention_analysis.ipynb` digs into the attention heads (copying scores, OV diagonals, attention patterns, targeted ablations). The findings — a copying head with the OV half of a bracket-completion mechanism but a QK circuit that can't route it — are written up in [`interp/induction_head.md`](interp/induction_head.md), with figures in `interp/figures/` and raw numbers in [`interp/evidence.md`](interp/evidence.md).
 
-Data is not committed (`.gitignore` excludes `data/`). Run `python grab_nietzsche.py` to fetch the 13 texts from Gutenberg into `data/`; it strips the Gutenberg boilerplate and writes the concatenated `grabbed_nietzsche.txt` that training consumes.
+Data is not committed (`.gitignore` excludes `model/data/`). Run `python grab_nietzsche.py` from inside `model/` to fetch the 13 texts from Gutenberg into `model/data/`; it strips the Gutenberg boilerplate and writes the concatenated `grabbed_nietzsche.txt` that training consumes.
 
 The trained checkpoint `niche_model.pt` **is** committed, because the interpretability writeup makes claims about these exact weights — training is stochastic, so a retrained model won't reproduce the per-head findings. Note it's a pickle-based `.pt` file: load it with `torch.load(..., weights_only=True)`.
 
