@@ -194,7 +194,7 @@ def load_model(path: str, map_location: str = "cpu") -> LoadedModel:
     ``map_location``), its config, the tokenizer maps, and ``encode`` / ``decode``
     helpers bound to that tokenizer.
     """
-    ckpt = torch.load(path, map_location=map_location, weights_only=False)
+    ckpt = torch.load(path, map_location=map_location, weights_only=True)
     config = Config(**ckpt["config"])
     model = build_model(config).to(map_location)
     model.load_state_dict(ckpt["model_state"])

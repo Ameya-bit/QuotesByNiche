@@ -1,6 +1,5 @@
-# data & model checkpoints
+# data & scratch checkpoint (niche_model.pt is committed for reproducibility)
 data/*
-niche_model.pt
 niche_model_last.pt
 
 # python

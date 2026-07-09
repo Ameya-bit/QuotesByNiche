@@ -12,7 +12,7 @@ Niche/
 ├── data/                           # downloaded texts (git-ignored)
 │   ├── grabbed_nietzsche.txt           # all books concatenated — this is what training reads
 │   └── <book>.txt                      # individual books, cached so re-runs don't re-download
-├── niche_model.pt                  # best-val checkpoint (git-ignored)
+├── niche_model.pt                  # best-val checkpoint (committed — the interp writeup analyzes these exact weights)
 ├── niche_attention_analysis.ipynb  # mech-interp: copying scores, OV/QK circuits, ablations
 ├── induction_head.md               # writeup of the interpretability findings
 ├── evidence.md                     # raw per-head copying-score numbers backing the writeup
@@ -27,7 +27,9 @@ The `niche.ipynb` notebook is the training project. Cells run top-to-bottom: imp
 
 After training, `niche_attention_analysis.ipynb` digs into the attention heads (copying scores, OV diagonals, attention patterns, targeted ablations). The findings — a copying head with the OV half of a bracket-completion mechanism but a QK circuit that can't route it — are written up in [`induction_head.md`](induction_head.md), with figures in `figures/` and raw numbers in [`evidence.md`](evidence.md).
 
-Data is not committed (`.gitignore` excludes `data/` and `niche_model.pt`). Run `python grab_nietzsche.py` to fetch the 13 texts from Gutenberg into `data/`; it strips the Gutenberg boilerplate and writes the concatenated `grabbed_nietzsche.txt` that training consumes.
+Data is not committed (`.gitignore` excludes `data/`). Run `python grab_nietzsche.py` to fetch the 13 texts from Gutenberg into `data/`; it strips the Gutenberg boilerplate and writes the concatenated `grabbed_nietzsche.txt` that training consumes.
+
+The trained checkpoint `niche_model.pt` **is** committed, because the interpretability writeup makes claims about these exact weights — training is stochastic, so a retrained model won't reproduce the per-head findings. Note it's a pickle-based `.pt` file: load it with `torch.load(..., weights_only=True)`.
 
 ## How the transformer is structured
 
