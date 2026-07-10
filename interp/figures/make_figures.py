@@ -359,10 +359,15 @@ def _verdict_table(cases, name, write):
     ax.set_ylim(0.3, n + 2.6)
     ax.axis("off")
 
-    # Column x-anchors (data coords 0..100). Spread wider than the old 12.6in
-    # layout: the narrower figure + larger fonts make text span more data-units,
-    # so columns need more separation to avoid collisions.
-    X_LABEL, X_SENT, X_QUERY, X_TOP, X_VERDICT = 1.5, 20, 53, 61, 77
+    # Column x-anchors (data coords 0..100). X_SENT=20 keeps the (long) PROMPT
+    # labels clear of the test string. TEST STRING can run to ~39 monospace chars
+    # (~0.78 data-units each) from X_SENT, reaching ~x=50, so QUERY sits at 56 to
+    # leave a clear gap -- the query glyph used to crowd the sentence end. The
+    # remaining columns shift right in step to preserve the inter-column spacing
+    # while making room for the new "@pos" annotations.
+    X_LABEL, X_SENT, X_QUERY, X_TOP, X_VERDICT = 1.5, 20, 56, 66, 82
+    POS_DX = 2.4     # small "@pos" annotation sits just right of its glyph
+    TW_DX = 6.0      # attention weight sits right of the top char + its @pos
     top_y = n + 1.05
 
     # Header.
@@ -393,16 +398,22 @@ def _verdict_table(cases, name, write):
                 fontfamily="monospace", color="#3a4149")
         ax.text(X_QUERY, y, glyph(c["query_char"]), fontsize=11, ha="left",
                 va="center", fontfamily="monospace", color="#3a4149")
+        ax.text(X_QUERY + POS_DX, y, f"@{c['q']}", fontsize=8.5, ha="left",
+                va="center", color="#9aa4ad")
 
         ax.text(X_TOP, y, f"{glyph(c['top_char'])}", fontsize=12, ha="left",
                 va="center", fontfamily="monospace", fontweight="bold", color=INK)
-        ax.text(X_TOP + 2.6, y, f"{c['top_w']:.2f}", fontsize=9.5, ha="left",
-                va="center", color="#6b747d")
+        ax.text(X_TOP + POS_DX, y, f"@{c['top_pos']}", fontsize=8.5, ha="left",
+                va="center", color="#9aa4ad")
+        # Attention weight (softmax over positions, 0..1) -- coloured to read as a
+        # distinct quantity from the "@pos" indices, matching fig3's attn colormap.
+        ax.text(X_TOP + TW_DX, y, f"{c['top_w']:.2f}", fontsize=9.5, ha="left",
+                va="center", color=OKABE["blue"], fontweight="bold")
 
         # Verdict chip.
         col = VERDICT_COLOR[c["verdict"]]
         chip = c["verdict"].replace(" (~pos 0)", "").upper()
-        ax.add_patch(Rectangle((X_VERDICT, y - 0.30), 18.5, 0.60,
+        ax.add_patch(Rectangle((X_VERDICT, y - 0.30), 17.5, 0.60,
                                facecolor=col, edgecolor="none", alpha=0.16,
                                zorder=1))
         ax.text(X_VERDICT + 0.8, y, chip, fontsize=9.8, ha="left", va="center",
@@ -417,6 +428,15 @@ def _verdict_table(cases, name, write):
                                facecolor=VERDICT_COLOR[key], alpha=0.5, edgecolor="none"))
         ax.text(lx + 2.0, ly, label, fontsize=9.5, va="center", ha="left", color="#5b6570")
         lx += 2.0 + len(label) * 0.72 + 3.0
+
+    # Annotation legend: "@N" are 0-indexed token positions (so a reader can see,
+    # e.g., a query at @0 that can only attend to itself); the coloured number
+    # after the top-attended char is the attention weight (softmax over positions,
+    # 0..1 -- exactly 1.00 when a first token attends only to itself).
+    ax.text(58, ly, "@N = token position", fontsize=8.5, style="italic",
+            va="center", ha="left", color="#8a939c")
+    ax.text(76, ly, "0.42 = attention weight", fontsize=8.5, style="italic",
+            va="center", ha="left", color=OKABE["blue"])
 
     # Height-aware header: reserve a fixed number of inches for title + subtitle
     # so short and tall tables get the same absolute spacing (no overlap).
@@ -437,7 +457,11 @@ def figure_break_quotes(write: bool = True):
         case("P2-A cat", 'the cat sat on the mat, the cat ran', 'c', iterate=1),
         case("P2-B dog", 'the dog sat on the mat, the dog ran', 'd', iterate=1),
         case("P3-A repeat", 'Zarathustra spoke. Later, Zarathustra', 'Z', iterate=1),
-        case("P3-B norepeat", 'Zarathustra spoke to the crowd below', 'Z', iterate=0),
+        # Stronger "no repeat" control: the sole Z sits *mid-string* (pos 22) with
+        # real prior context, so a SINK verdict is a meaningful null -- the head
+        # declines to fire absent an earlier match, rather than the degenerate
+        # first-token case where pos 0 can only attend to itself.
+        case("P3-B norepeat", 'the crowd below heard Zarathustra', 'Z', iterate=0),
         case("P4-A apple-last",  '"apple" ... "banana" ... "apple', '"'),
         case("P4-B banana-last", '"banana" ... "apple" ... "banana', '"'),
         case("P5-A prior-opens", 'He said "one. She said "two. He said "', '"'),
