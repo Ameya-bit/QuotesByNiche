@@ -55,8 +55,10 @@ ATTN_CMAP = LinearSegmentedColormap.from_list(
 VERDICT_COLOR = {
     "INDUCTION": OKABE["green"],
     "SINK (~pos 0)": OKABE["orange"],
-    "previous-token": "#7a8894",
-    "other": "#9aa4ad",
+    # Distinct dark-slate vs light-grey: the verdict is shown as a bare colour dot,
+    # so these two "neither induction nor sink" cases must be told apart by shade.
+    "previous-token": "#5f6f7c",
+    "other": "#aab2b9",
 }
 
 mpl.rcParams.update({
@@ -157,7 +159,7 @@ def case(label, sentence, token, iterate=-1, watch=None):
         "label": label, "sentence": sentence, "token": token, "q": q,
         "query_char": sentence[q], "occs": occs, "targets": sorted(targets),
         "verdict": verdict, "top_pos": amax_pos, "top_char": amax_ch,
-        "top_w": amax_w, "watch": watched,
+        "top_w": amax_w, "ranked": ranked, "watch": watched,
     }
 
 
@@ -178,36 +180,72 @@ def figure_make(write: bool = True):
     TOP_N = 13
     order = [c for c, _ in sorted(nor_by.items(), key=lambda x: x[1], reverse=True)[:TOP_N]]
     order = order[::-1]                       # so the largest ends up at the top of the bars
-    y = range(len(order))
-    raw_vals = [raw_by[c] for c in order]
-    nor_vals = [nor_by[c] for c in order]
+
+    # Parentheses sit far outside the top-13 -- '(' is rank 39/177 and ')' is dead
+    # last (177/177, the *most* anti-copied token in the vocab). Show them as a
+    # separate reference group below the top block so the bracket-grammar
+    # hypothesis (fig5) can be read straight off the OV diagonal: the head does
+    # not self-copy either paren, and actively pushes ')' down.
+    paren_chars = ['(', ')']
+    main_y = list(range(len(order)))
+    paren_y = [-1.8 - i for i in range(len(paren_chars))]      # sit below the group
+
+    all_chars = order + paren_chars
+    all_y = main_y + paren_y
+    raw_vals = [raw_by[c] for c in all_chars]
+    nor_vals = [nor_by[c] for c in all_chars]
 
     def bar_colors(chars):
-        return [OKABE["blue"] if c == '"' else MUTED for c in chars]
+        out = []
+        for c in chars:
+            if c in ("(", ")"):
+                out.append(OKABE["vermillion"])       # bracket reference group
+            elif c == '"':
+                out.append(OKABE["blue"])              # the copying head's signature
+            else:
+                out.append(MUTED)
+        return out
 
-    fig, (axL, axR) = plt.subplots(1, 2, figsize=(11, 5.8), sharey=True)
+    fig, (axL, axR) = plt.subplots(1, 2, figsize=(11, 6.6), sharey=True)
 
-    axL.barh(list(y), raw_vals, color=bar_colors(order), height=0.68,
+    axL.barh(all_y, raw_vals, color=bar_colors(all_chars), height=0.68,
              edgecolor="white", linewidth=0.6)
-    axR.barh(list(y), nor_vals, color=bar_colors(order), height=0.68,
+    axR.barh(all_y, nor_vals, color=bar_colors(all_chars), height=0.68,
              edgecolor="white", linewidth=0.6)
 
-    axL.set_yticks(list(y))
-    axL.set_yticklabels([glyph(c) for c in order], fontfamily="monospace", fontsize=11)
+    axL.set_yticks(all_y)
+    axL.set_yticklabels([glyph(c) for c in all_chars], fontfamily="monospace", fontsize=11)
     axL.set_title("Raw OV diagonal", pad=10)
     axR.set_title("Norm-normalized OV diagonal", pad=10)
     axL.set_xlabel("self-copy logit  (attend $X$ → boost $X$)")
     axR.set_xlabel("logit ÷ (‖embed‖·‖unembed‖) per token")
 
+    # Value labels; parens carry the vermillion accent so bar and number read as
+    # one reference group. Negative bars (e.g. ')') get their label on the left.
+    label_col = [OKABE["vermillion"] if c in ("(", ")") else "#556" for c in all_chars]
+    sep_y = (min(main_y) + max(paren_y)) / 2       # divider between block and parens
+
     for ax, vals, fmt in ((axL, raw_vals, "{:.1f}"), (axR, nor_vals, "{:+.2f}")):
         ax.axvline(0, color="#cfd4d9", lw=0.8, zorder=0)
         ax.grid(axis="x", color=GRID, lw=0.8, zorder=0)
         ax.set_axisbelow(True)
-        pad = 0.02 * max(vals)
-        for yi, val in zip(y, vals):
-            ax.text(val + pad, yi, fmt.format(val), va="center", ha="left",
-                    fontsize=8.5, color="#556")
+        ax.axhline(sep_y, color="#d3d7db", lw=0.8, ls=(0, (4, 3)), zorder=1)
+        pad = 0.02 * max(abs(v) for v in vals)
+        for yi, val, lc in zip(all_y, vals, label_col):
+            if val >= 0:
+                ax.text(val + pad, yi, fmt.format(val), va="center", ha="left",
+                        fontsize=8.5, color=lc)
+            else:
+                ax.text(val - pad, yi, fmt.format(val), va="center", ha="right",
+                        fontsize=8.5, color=lc)
         ax.margins(x=0.14)
+        ax.set_ylim(min(paren_y) - 0.8, max(main_y) + 0.7)
+
+    # Flag the bracket reference group and where the parens actually rank.
+    axR.text(0.315, (paren_y[0] + paren_y[-1]) / 2,
+             "brackets are not self-copied\n('(' #39,  ')' last of 177)",
+             fontsize=8, style="italic", color=OKABE["vermillion"],
+             va="center", ha="left")
 
     # Call out the quote -- the copying head's signature -- surviving to the top.
     qi = order.index('"')
@@ -348,33 +386,37 @@ def figure_divert(write: bool = True):
 #   their own table so each control reads on its own terms. The honest-wrinkle
 #   caveats now live in the LaTeX captions, not baked into the image.
 # ===========================================================================
-def _verdict_table(cases, name, write):
+def _verdict_table(cases, name, write, fig_w=11.0):
     n = len(cases)
     row_h = 1.0
     fig_h = 0.52 * n + 3.2
-    # Narrower figure -> less downscaling when fit to \linewidth, so the grid
-    # text lands larger in the PDF (fonts below are bumped to match).
-    fig, ax = plt.subplots(figsize=(11.0, fig_h))
+    # Column anchors are fixed in 0..100 data coords while text is a fixed point
+    # size, so a physically wider figure spreads the columns apart (each gap spans
+    # more inches and the text fills proportionally less of it) without any
+    # re-layout. fig_w lets one table run wider than another (fig4 does).
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
     ax.set_xlim(0, 100)
     ax.set_ylim(0.3, n + 2.6)
     ax.axis("off")
 
-    # Column x-anchors (data coords 0..100). X_SENT=20 keeps the (long) PROMPT
-    # labels clear of the test string. TEST STRING can run to ~39 monospace chars
-    # (~0.78 data-units each) from X_SENT, reaching ~x=50, so QUERY sits at 56 to
-    # leave a clear gap -- the query glyph used to crowd the sentence end. The
-    # remaining columns shift right in step to preserve the inter-column spacing
-    # while making room for the new "@pos" annotations.
-    X_LABEL, X_SENT, X_QUERY, X_TOP, X_VERDICT = 1.5, 20, 56, 66, 82
-    POS_DX = 2.4     # small "@pos" annotation sits just right of its glyph
-    TW_DX = 6.0      # attention weight sits right of the top char + its @pos
+    # Column x-anchors (data coords 0..100). PROMPT + a ~39-char TEST STRING fill
+    # the left half, so QUERY and the three TOP-k cells are packed into the right
+    # half at a ~9-unit pitch. Each TOP-k cell is "char @pos weight"; VERDICT is a
+    # compact colour cue (dot + label), not a filled chip, to free the space.
+    X_LABEL, X_SENT, X_QUERY = 1.5, 20, 51
+    X_T1, X_T2, X_T3 = 60, 72, 84       # wider ~12-unit pitch -> roomier columns
+    X_VERDICT = 95        # verdict is now just a centred colour dot (see legend)
+    POS_DX = 2.0     # small "@pos" annotation sits just right of its glyph
+    TW_DX = 5.6      # attention weight sits clear to the right of the char + @pos
     top_y = n + 1.05
 
     # Header.
-    for x, txt in ((X_LABEL, "PROMPT"), (X_SENT, "TEST STRING"),
-                   (X_QUERY, "QUERY"), (X_TOP, "TOP ATTENDED"), (X_VERDICT, "VERDICT")):
-        ax.text(x, top_y, txt, fontsize=11, fontweight="bold", color="#5b6570",
+    for x, txt in ((X_LABEL, "PROMPT"), (X_SENT, "TEST STRING"), (X_QUERY, "QUERY"),
+                   (X_T1, "TOP 1"), (X_T2, "TOP 2"), (X_T3, "TOP 3")):
+        ax.text(x, top_y, txt, fontsize=9.5, fontweight="bold", color="#5b6570",
                 ha="left", va="center")
+    ax.text(X_VERDICT, top_y, "VERDICT", fontsize=9.5, fontweight="bold",
+            color="#5b6570", ha="center", va="center")   # centred over the dots
     ax.plot([X_LABEL, 99], [top_y - 0.55, top_y - 0.55], color="#c7ccd1", lw=1.0)
 
     # Zebra banding by prompt pair (P1, P2, ... in order of appearance).
@@ -394,30 +436,32 @@ def _verdict_table(cases, name, write):
                 fontweight="bold", color=INK)
         sent = c["sentence"]
         shown = sent if len(sent) <= 40 else sent[:38] + "…"
-        ax.text(X_SENT, y, shown, fontsize=9, ha="left", va="center",
+        ax.text(X_SENT, y, shown, fontsize=7.5, ha="left", va="center",
                 fontfamily="monospace", color="#3a4149")
         ax.text(X_QUERY, y, glyph(c["query_char"]), fontsize=11, ha="left",
                 va="center", fontfamily="monospace", color="#3a4149")
-        ax.text(X_QUERY + POS_DX, y, f"@{c['q']}", fontsize=8.5, ha="left",
+        ax.text(X_QUERY + POS_DX, y, f"@{c['q']}", fontsize=7.5, ha="left",
                 va="center", color="#9aa4ad")
 
-        ax.text(X_TOP, y, f"{glyph(c['top_char'])}", fontsize=12, ha="left",
-                va="center", fontfamily="monospace", fontweight="bold", color=INK)
-        ax.text(X_TOP + POS_DX, y, f"@{c['top_pos']}", fontsize=8.5, ha="left",
-                va="center", color="#9aa4ad")
-        # Attention weight (softmax over positions, 0..1) -- coloured to read as a
-        # distinct quantity from the "@pos" indices, matching fig3's attn colormap.
-        ax.text(X_TOP + TW_DX, y, f"{c['top_w']:.2f}", fontsize=9.5, ha="left",
-                va="center", color=OKABE["blue"], fontweight="bold")
+        # TOP 1 / 2 / 3 -- the three most-attended tokens, each as "char @pos weight".
+        # The winner (top-1) is emphasised and runners-up are lighter, so the
+        # ranking reads at a glance while the exact weights expose near-ties (the
+        # induction target only just beating the sink in the P4 rows).
+        for xk, (p, ch, w) in zip((X_T1, X_T2, X_T3), c["ranked"][:3]):
+            lead = xk == X_T1
+            ax.text(xk, y, glyph(ch), fontsize=10.5 if lead else 9.5, ha="left",
+                    va="center", fontfamily="monospace",
+                    fontweight="bold" if lead else "normal",
+                    color=INK if lead else "#5a636b")
+            ax.text(xk + POS_DX, y, f"@{p}", fontsize=7.5, ha="left", va="center",
+                    color="#9aa4ad")
+            ax.text(xk + TW_DX, y, f"{w:.2f}", fontsize=8, ha="left", va="center",
+                    color=OKABE["blue"], fontweight="bold" if lead else "normal")
 
-        # Verdict chip.
-        col = VERDICT_COLOR[c["verdict"]]
-        chip = c["verdict"].replace(" (~pos 0)", "").upper()
-        ax.add_patch(Rectangle((X_VERDICT, y - 0.30), 17.5, 0.60,
-                               facecolor=col, edgecolor="none", alpha=0.16,
-                               zorder=1))
-        ax.text(X_VERDICT + 0.8, y, chip, fontsize=9.8, ha="left", va="center",
-                color=col, fontweight="bold", zorder=2)
+        # Verdict -- a single centred colour dot (see the legend swatches for the
+        # mapping); the text label is dropped to give the TOP-k columns more room.
+        ax.plot([X_VERDICT], [y], marker="o", ms=8, color=VERDICT_COLOR[c["verdict"]],
+                alpha=0.9, markeredgecolor="none", zorder=2)
 
     # Legend for verdict colours.
     lx = X_LABEL
@@ -429,14 +473,9 @@ def _verdict_table(cases, name, write):
         ax.text(lx + 2.0, ly, label, fontsize=9.5, va="center", ha="left", color="#5b6570")
         lx += 2.0 + len(label) * 0.72 + 3.0
 
-    # Annotation legend: "@N" are 0-indexed token positions (so a reader can see,
-    # e.g., a query at @0 that can only attend to itself); the coloured number
-    # after the top-attended char is the attention weight (softmax over positions,
-    # 0..1 -- exactly 1.00 when a first token attends only to itself).
-    ax.text(58, ly, "@N = token position", fontsize=8.5, style="italic",
-            va="center", ha="left", color="#8a939c")
-    ax.text(76, ly, "0.42 = attention weight", fontsize=8.5, style="italic",
-            va="center", ha="left", color=OKABE["blue"])
+    # Annotation legend: what the small numbers in the query / top-k cells mean.
+    ax.text(50, ly, "@N = token position   ·   weight = attention (softmax)",
+            fontsize=8.5, style="italic", va="center", ha="left", color="#8a939c")
 
     # Height-aware header: reserve a fixed number of inches for title + subtitle
     # so short and tall tables get the same absolute spacing (no overlap).
@@ -471,6 +510,7 @@ def figure_break_quotes(write: bool = True):
         cases,
         name="fig4_break_quote_grammar",
         write=write,
+        fig_w=14.0,        # wider than fig5 -> roomier columns
     )
 
 
